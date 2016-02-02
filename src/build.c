@@ -182,7 +182,7 @@ void sqlite3FinishCoding(Parse *pParse){
           pParse->cookieValue[iDb],          /* P3 */
           db->aDb[iDb].pSchema->iGeneration  /* P4 */
         );
-        if( db->init.busy==0 ) sqlite3VdbeChangeP5(v, 1);
+        if( db->init.busy==0 ) sqlite3VdbeChangeP5(v, OPFLAG_TXNCK);
         VdbeComment((v,
               "usesStmtJournal=%d", pParse->mayAbort && pParse->isMultiWrite));
       }
@@ -3906,6 +3906,7 @@ void sqlite3BeginTransaction(Parse *pParse, int type){
   if( type!=TK_DEFERRED ){
     for(i=0; i<db->nDb; i++){
       sqlite3VdbeAddOp2(v, OP_Transaction, i, (type==TK_EXCLUSIVE)+1);
+      sqlite3VdbeChangeP5(v, OPFLAG_TXNBEGIN);
       sqlite3VdbeUsesBtree(v, i);
     }
   }

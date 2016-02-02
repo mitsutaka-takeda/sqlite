@@ -3082,16 +3082,21 @@ case OP_AutoCommit: {
 ** entire transaction. If no error is encountered, the statement transaction
 ** will automatically commit when the VDBE halts.
 **
-** If P5!=0 then this opcode also checks the schema cookie against P3
-** and the schema generation counter against P4.
-** The cookie changes its value whenever the database schema changes.
-** This operation is used to detect when that the cookie has changed
+** If the OPFLAG_TXNCK bit (0x01) of P5 is set then this opcode also
+** checks the schema cookie against P3 and the schema generation counter
+** against P4.  The cookie changes its value whenever the database schema
+** changes.  This operation is used to detect when that the cookie has changed
 ** and that the current process needs to reread the schema.  If the schema
 ** cookie in P3 differs from the schema cookie in the database header or
 ** if the schema generation counter in P4 differs from the current
 ** generation counter, then an SQLITE_SCHEMA error is raised and execution
 ** halts.  The sqlite3_step() wrapper function might then reprepare the
 ** statement and rerun it from the beginning.
+**
+** The OPFLAG_TXNBEGIN bit (0x02) of P5 is set if this opcode is part of
+** the implementation of a BEGIN statement.  The OPFLAG_TXNBEGIN bit allows
+** a write transaction to proceed even if the SQLITE_RequireWrTxn bit is
+** set on the database connection.
 */
 case OP_Transaction: {
   Btree *pBt;
@@ -3102,9 +3107,15 @@ case OP_Transaction: {
   assert( p->readOnly==0 || pOp->p2==0 );
   assert( pOp->p1>=0 && pOp->p1<db->nDb );
   assert( DbMaskTest(p->btreeMask, pOp->p1) );
-  if( pOp->p2 && (db->flags & SQLITE_QueryOnly)!=0 ){
-    rc = SQLITE_READONLY;
-    goto abort_due_to_error;
+  if( pOp->p2 && (db->flags & (SQLITE_QueryOnly|SQLITE_RequireWrTxn))!=0 ){
+    if( db->flags & SQLITE_QueryOnly ){
+      rc = SQLITE_READONLY;
+      goto abort_due_to_error;
+    }
+    if( db->autoCommit && (pOp->p5 & OPFLAG_TXNBEGIN)==0 ){
+      rc = SQLITE_READONLY_NOTXN;
+      goto abort_due_to_error;
+    }
   }
   pBt = db->aDb[pOp->p1].pBt;
 
@@ -3154,10 +3165,9 @@ case OP_Transaction: {
   }else{
     iGen = iMeta = 0;
   }
-  assert( pOp->p5==0 || pOp->p4type==P4_INT32 );
-  if( pOp->p5 && (iMeta!=pOp->p3 || iGen!=pOp->p4.i) ){
-    sqlite3DbFree(db, p->zErrMsg);
-    p->zErrMsg = sqlite3DbStrDup(db, "database schema has changed");
+  assert( (pOp->p5 & OPFLAG_TXNCK)==0 || pOp->p4type==P4_INT32 );
+  if( (pOp->p5 & OPFLAG_TXNCK)!=0 && (iMeta!=pOp->p3 || iGen!=pOp->p4.i) ){
+    sqlite3VdbeError(p, "database schema has changed");
     /* If the schema-cookie from the database file matches the cookie 
     ** stored with the in-memory representation of the schema, do
     ** not reload the schema from the database file.

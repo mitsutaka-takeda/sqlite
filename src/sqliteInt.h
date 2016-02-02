@@ -1316,6 +1316,7 @@ struct sqlite3 {
 #define SQLITE_VdbeEQP        0x04000000  /* Debug EXPLAIN QUERY PLAN */
 #define SQLITE_Vacuum         0x08000000  /* Currently in a VACUUM */
 #define SQLITE_CellSizeCk     0x10000000  /* Check btree cell sizes on load */
+#define SQLITE_RequireWrTxn   0x20000000  /* BEGIN required to write */
 
 
 /*
@@ -2863,6 +2864,8 @@ struct AuthContext {
 #define OPFLAG_PERMUTE       0x01    /* OP_Compare: use the permutation */
 #define OPFLAG_SAVEPOSITION  0x02    /* OP_Delete: keep cursor position */
 #define OPFLAG_AUXDELETE     0x04    /* OP_Delete: index in a DELETE op */
+#define OPFLAG_TXNCK         0x01    /* OP_Transaction: check cookie */
+#define OPFLAG_TXNBEGIN      0x02    /* OP_Transaction: part of BEGIN */
 
 /*
  * Each trigger present in the database schema is stored as an instance of

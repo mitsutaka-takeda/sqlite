@@ -1,0 +1,106 @@
+# 2016-02-01
+#
+# The author disclaims copyright to this source code.  In place of
+# a legal notice, here is a blessing:
+#
+#    May you do good and not evil.
+#    May you find forgiveness for yourself and forgive others.
+#    May you share freely, never taking more than you give.
+#
+#***********************************************************************
+# This file implements regression tests for SQLite library.  The
+# focus of this file is testing the sqlite3_db_config() interface
+#
+
+set testdir [file dirname $argv0]
+source $testdir/tester.tcl
+set ::testprefix dbconfig1
+
+do_test 100 {
+  db eval {PRAGMA foreign_keys=ON;}
+  sqlite3_db_config_flag db 1002 0
+} {0}
+do_test 101 {
+  db eval {PRAGMA foreign_keys;}
+} {0}
+do_test 102 {
+  sqlite3_db_config_flag db 1002 1
+} {1}
+do_test 103 {
+  db eval {PRAGMA foreign_keys;}
+} {1}
+do_test 104 {
+  sqlite3_db_config_flag db -1002 0
+} {-99}
+
+# Require explicit BEGIN...COMMIT in order to modify the database
+#
+sqlite3_db_config_flag db 1004 1
+do_catchsql_test 200 {
+  CREATE TABLE t1(x);
+} {1 {attempt to write a readonly database}}
+do_execsql_test 201 {
+  BEGIN;
+  CREATE TABLE t1(x);
+  COMMIT;
+  SELECT name FROM sqlite_master ORDER BY name;
+} {t1}
+do_execsql_test 202 {
+  BEGIN IMMEDIATE;
+  CREATE TABLE t2(x);
+  COMMIT;
+  SELECT name FROM sqlite_master ORDER BY name;
+} {t1 t2}
+do_execsql_test 203 {
+  BEGIN EXCLUSIVE;
+  CREATE TABLE t3(x);
+  COMMIT;
+  SELECT name FROM sqlite_master ORDER BY name;
+} {t1 t2 t3}
+do_execsql_test 204 {
+  BEGIN;
+  WITH RECURSIVE c(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM c WHERE x<100)
+  INSERT INTO t1(x) SELECT randomblob(500) FROM c;
+  COMMIT;
+  BEGIN;
+  DELETE FROM t1 WHERE rowid%4!=0;
+  COMMIT;
+  VACUUM;
+  PRAGMA integrity_check;
+} {ok}
+
+do_execsql_test 210 {
+  PRAGMA journal_mode=WAL;
+} {wal}
+do_execsql_test 211 {
+  BEGIN;
+  CREATE TABLE t4(x);
+  COMMIT;
+  SELECT name FROM sqlite_master ORDER BY name;
+} {t1 t2 t3 t4}
+do_execsql_test 212 {
+  BEGIN IMMEDIATE;
+  CREATE TABLE t5(x);
+  COMMIT;
+  SELECT name FROM sqlite_master ORDER BY name;
+} {t1 t2 t3 t4 t5}
+do_execsql_test 213 {
+  BEGIN EXCLUSIVE;
+  CREATE TABLE t6(x);
+  COMMIT;
+  SELECT name FROM sqlite_master ORDER BY name;
+} {t1 t2 t3 t4 t5 t6}
+do_execsql_test 214 {
+  BEGIN;
+  WITH RECURSIVE c(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM c WHERE x<100)
+  INSERT INTO t6(x) SELECT randomblob(500) FROM c;
+  COMMIT;
+  BEGIN;
+  DELETE FROM t6 WHERE rowid%4!=0;
+  COMMIT;
+  VACUUM;
+  PRAGMA integrity_check;
+} {ok}
+
+
+finish_test

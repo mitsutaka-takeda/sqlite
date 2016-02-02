@@ -2248,6 +2248,47 @@ static int test_config_sqllog(
 #endif
 
 /*
+** Usage:  sqlite3_db_config_flag db FLAG-VALUE ON/OFF
+**
+** Run one of the sqlite3_db_config(db, <flag>, int, int) interfaces.
+**
+** If FLAG-VALUE is negative, then make the last argument to sqlite3_db_config()
+** be NULL rather than a pointer to an integer.
+*/
+static int test_db_config_flag(
+  void * clientData,
+  Tcl_Interp *interp,
+  int objc,
+  Tcl_Obj *CONST objv[]
+){
+  sqlite3 *db;
+  int iFlag;
+  int iNewValue;
+  int iResult;
+  int *piResult = &iResult;
+  int rc;
+  if( objc!=4 ){ 
+    Tcl_WrongNumArgs(interp, 1, objv, "");
+    return TCL_ERROR;
+  }
+  if( getDbPointer(interp, Tcl_GetString(objv[1]), &db) ) return TCL_ERROR;
+  if( Tcl_GetIntFromObj(interp, objv[2], &iFlag) ) return TCL_ERROR;
+  if( Tcl_GetIntFromObj(interp, objv[3], &iNewValue) ) return TCL_ERROR;
+  if( iFlag<0 ){
+    iFlag = -iFlag;
+    piResult = 0;
+  }
+  iResult = -99;
+  rc = sqlite3_db_config(db, iFlag, iNewValue, piResult);
+  if( rc ){
+    Tcl_AppendResult(interp, "sqlite3_dbconfig() returned non-zero", (char*)0);
+    return TCL_ERROR;
+  }
+  Tcl_SetObjResult(interp, Tcl_NewIntObj(iResult));
+  return TCL_OK;
+}
+
+/*
 ** Usage: vfs_current_time_int64
 **
 ** Return the value returned by the default VFS's xCurrentTimeInt64 method.
@@ -7170,7 +7211,8 @@ int Sqlitetest1_Init(Tcl_Interp *interp){
 #ifdef SQLITE_ENABLE_SQLLOG
      { "sqlite3_config_sqllog",         test_config_sqllog,   0 },
 #endif
-     { "vfs_current_time_int64",           vfsCurrentTimeInt64,   0 },
+     { "vfs_current_time_int64",        vfsCurrentTimeInt64,  0 },
+     { "sqlite3_db_config_flag",        test_db_config_flag,  0 }, 
 #ifdef SQLITE_ENABLE_SNAPSHOT
      { "sqlite3_snapshot_get", test_snapshot_get, 0 },
      { "sqlite3_snapshot_open", test_snapshot_open, 0 },
