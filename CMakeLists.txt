@@ -29,6 +29,7 @@ add_custom_command(
 
 add_library(
   sqlite3
+  STATIC
   ${CMAKE_CURRENT_BINARY_DIR}/sqlite3.c
   ${CMAKE_CURRENT_BINARY_DIR}/include/sqlite3.h
   )
